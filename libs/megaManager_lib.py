@@ -7,6 +7,7 @@
 from logging import getLogger
 from numpy import array, load, savez_compressed
 from os import chdir, kill, listdir, path
+from re import split, sub
 from signal import SIGTERM
 from subprocess import call, PIPE, Popen
 from tools import CompressImage
@@ -75,49 +76,63 @@ class MegaManager_Lib(object):
         except Exception as e:
             logger.debug(' Exception: %s' % str(e))
     
-    def exec_cmd(self, command, workingDir=None, noWindow=False):
+    def exec_cmd(self, command, workingDir=None, noWindow=False, outputFile=None):
         """
         Execute given command.
+
+        Args:
+            command (str): Command to execute.
+            workingDir (str): Working directory.
+            noWindow (bool): No window will be created if true.
+            outputFile (str): file path to output program output to.
     
-        :param command: Command to execute.
-        :type command: String
-        :param workingDir: Working directory.
-        :type workingDir: String
-        :param noWindow: No window will be created if true.
-        :type noWindow: Boolean
-    
-        :return: subprocess object
+        Returns:
+            subprocess object
         """
     
         logger = getLogger('MegaManager_Lib.exec_cmd')
         logger.setLevel(self.__logLevel)
     
         logger.debug(' Executing command: "%s"' % command)
-    
+
+        outFile = open(outputFile, 'a')
+
         if workingDir:
             chdir(workingDir)
-    
+
         if noWindow:
             CREATE_NO_WINDOW = 0x08000000
-            proc = call(command, creationflags=CREATE_NO_WINDOW)
+            proc = call(command, stdout=outFile, stderr=outFile, creationflags=CREATE_NO_WINDOW)
         else:
             proc = call(command)
     
-        return proc
+        while not proc.poll():
+            pass
 
-    def exec_cmd_and_return_output(self, command, workingDir=None):
+        outFile.close()
+        exitCode = proc.returnCode()
+
+        if exitCode == 0:
+            logger.debug(' Successfully executed command "%s".' % command)
+            return True
+        else:
+            logger.debug(' Error when running command "%s".' % command)
+            return False
+
+    def exec_cmd_and_return_output(self, command, workingDir=None, outputFile=None):
         """
         Execute given command and return stdout and stderr.
 
-        :param command: Command to execute.
-        :type command: String
-        :param workingDir: Working directory.
-        :type workingDir: String
+        Args:
+            command (str): Command to execute.
+            workingDir (str): Working directory.
+            outputFile (str): File to pipe process output to.
 
-        :return: Tuple of output and error: stdout and stderr
+        Returns:
+            Tuple: of stdout and stderr.
         """
 
-        logger = getLogger('MegaTools_Lib.exec_cmd')
+        logger = getLogger('MegaTools_Lib.exec_cmd_and_return_output')
         logger.setLevel(self.__logLevel)
 
         logger.debug(' Executing command: "%s"' % command)
@@ -125,23 +140,34 @@ class MegaManager_Lib(object):
         if workingDir:
             chdir(workingDir)
 
-        proc = Popen(command, stdout=PIPE, shell=True)
+        outFile = open(outputFile, 'a')
+        try:
+            if outFile:
+                proc = Popen(command, stdout=outputFile, stderr=outFile)
+            else:
+                proc = Popen(command, stdout=PIPE, shell=True)
 
-        (out, err) = proc.communicate()
+            (out, err) = proc.communicate()
+        except Exception as e:
+            logger.warning(' Exception: %s' % str(e))
+            return None, None
+        finally:
+            outFile.close()
 
         return out, err
 
     def get_mb_size_from_bytes(self, bytes):
         """
         Convert bytes to size in MegaBytes.
-    
-        :param bytes: Size in bytes.
-        :type bytes: Integer.
-    
-        :return: Size in MegaBytes from bytes.
+
+        Args:
+            bytes (int): Size in bytes.
+
+        Returns:
+            string: Size in MegaBytes converted from bytes.
         """
     
-        logger = getLogger('MegaManager.get_mb_size_from_bytes')
+        logger = getLogger('MegaManager_Lib.get_mb_size_from_bytes')
         logger.setLevel(self.__logLevel)
     
         logger.debug(' Converting kilobytes to megabytes.')
@@ -159,7 +185,37 @@ class MegaManager_Lib(object):
             result = '%.1f' % float(bytes / 1000000000000) + 'TB'
     
         return result
-    
+
+    def get_remote_path_from_local_path(self, localPath, localRoot="\\", remoteRoot="\\"):
+        """
+        Get remote path given local path.
+
+        Args:
+            localPath (str): Local path.
+            localRoot (str): Local root
+            remoteRoot (str): Remote root.
+        Returns:
+            string: Remote path.
+        """
+
+        logger = getLogger('MegaManager_Lib.get_remote_path_from_local_path')
+        logger.setLevel(self.__logLevel)
+
+        logger.debug(' Getting remote path from local path')
+
+        localRoot_adj = sub('\\\\', '/', localRoot)
+        localFilePath_adj = sub('\\\\', '/', localPath)
+        postfix = split(localRoot_adj, localFilePath_adj)
+
+        if len(postfix) > 1:
+            subPath = postfix[1]
+
+            logger.debug(' Success, could get remote path from local path.')
+            return remoteRoot + subPath
+        else:
+            logger.debug(' Error, could NOT get remote path from local path!')
+            return None
+
     def get_sleep_time(self):
             """
             Get time in seconds to sleep. Function is used to pace program speed during iterations.
