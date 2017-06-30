@@ -200,10 +200,7 @@ class MegaTools_Lib(object):
 
         if remotePath:
 
-            chdir('%s' % self.__megaToolsDir)
-
             cmd = 'start /B megals -lnR -u %s -p %s "%s"' % (username, password, remotePath)
-
             out, err = self.__lib.exec_cmd_and_return_output(command=cmd, workingDir=self.__megaToolsDir)
 
             lines = out.split('\r\n')

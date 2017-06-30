@@ -451,8 +451,8 @@ class MegaManager(object):
         Remove remote files that don't exist locally.
 
         Args:
-            username (str): username of account to __upload to
-            password (str): Password of account to __upload to
+            username (str): username of account to upload to
+            password (str): Password of account to upload to
         """
 
         logger = getLogger('MegaManager._delete_remote_files_that_dont_exist_locally')
@@ -463,8 +463,6 @@ class MegaManager(object):
         dontExistLocally = self._get_remote_files_that_dont_exist_locally(username=username, password=password)
 
         for filePath in dontExistLocally:
-
-            # fileName, fileExt = path.splitext(filePath)
 
             if not filePath in self.__removedRemoteFiles:
                 higherDirRemoved = False
@@ -608,21 +606,15 @@ class MegaManager(object):
         """
         Find video files to __compressAll.
 
-        :param username: username of account to find local video files for
-        :type username: string
-        :param password: password of account to find local video files for
-        :type password: string
-        :param self.__remoteRoot: Remote path to mirror locally to iterate through.
-        :type self.__remoteRoot: String.
-
-        :return:
-        :type:
+        Args:
+            username (str): username of account to find local video files for
+            password (str): password of account to find local video files for
         """
 
         logger = getLogger('MegaManager._find_video_files_to_compress')
         logger.setLevel(self.__logLevel)
         
-        logger.debug(' Finding video files to __compressAll.')
+        logger.debug(' Finding video files to compress.')
 
         localRoot_adj = sub('\\\\', '/', self.__localRoot)
         chdir('%s' % self.__megaToolsDir)
