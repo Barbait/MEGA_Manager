@@ -10,7 +10,7 @@
 
 from argparse import ArgumentParser
 from logging import DEBUG, getLogger, FileHandler, Formatter, StreamHandler
-from libs import FFMPEG_Lib, MegaManager_Lib, MegaTools_Lib
+from libs import FFMPEG_Lib, Lib, MegaTools_Lib
 from os import chdir, getpid, path, remove, rename, walk
 from psutil import IDLE_PRIORITY_CLASS, Process
 from random import randint
@@ -96,7 +96,7 @@ class MegaManager(object):
             self._load_config_file()
 
             self.__ffmpeg = FFMPEG_Lib(ffmpegExePath=self.__ffmpegExePath, logLevel=self.__logLevel)
-            self.__lib = MegaManager_Lib(logLevel=self.__logLevel)
+            self.__lib = Lib(logLevel=self.__logLevel)
             self.__megaTools = MegaTools_Lib(megaToolsDir=self.__megaToolsDir, downSpeedLimit=self.__downSpeed,
                                              upSpeedLimit=self.__upSpeed, logLevel=self.__logLevel)
 
@@ -311,7 +311,7 @@ class MegaManager(object):
 
         logger.debug(' Creating thread to create "%s" file.' % self.__megaAccountsOutputPath)
 
-        t = Thread(target=self._create_mega_accounts_data_file, name='thread_createself.megaAccountsData_file')
+        t = Thread(target=self._create_mega_accounts_data_file, name='thread_create_mega_accounts_data_file')
         self.__threads.append(t)
         t.start()
 
@@ -572,7 +572,7 @@ class MegaManager(object):
 
                             if (path.exists(local_filePath)):
                                 if (local_filePath not in self.__compressedImageFiles) and (local_filePath not in self.__unableToCompressImageFiles):
-                                    result = self.__lib.compress_image_file(local_filePath, )
+                                    result = self.__lib.compress_image_file(filePath=local_filePath)
                                     if result:
                                         compressPath_backup = local_filePath + '.compressimages-backup'
                                         if path.exists(compressPath_backup):
@@ -692,26 +692,6 @@ class MegaManager(object):
                             else:
                                 logger.debug(
                                     ' Error, local video file doesnt exist: "%s"!' % local_filePath)
-
-    def _compress_image_file_delete_backup(self, filePath):
-        """
-        Compress image file and delete backup file that is created of old file
-
-        :param filePath: File path of image file to __compressAll.
-        :type filePath: string
-
-        :return: subprocess object
-        """
-
-        logger = getLogger('MegaManager._compress_image_file_delete_backup')
-        logger.setLevel(self.__logLevel)
-
-        logger.debug(' Deleting compressed backup files "%s".' % filePath)
-
-        CREATE_NO_WINDOW = 0x08000000
-        proc1 = call('python tools\\__compressImages\\__compressImages.py --mode detletebackup "%s"' % (filePath),  creationflags=CREATE_NO_WINDOW)
-        return proc1
-
 
     def _create_mega_accounts_data_file(self):
         """
@@ -865,31 +845,31 @@ def get_args():
 
     parser = ArgumentParser(description='MEGA Manager is a MEGA cloud storage management and optimization application.')
 
-    parser.add_argument('--__download', dest='__download', action='store_true', default=False,
+    parser.add_argument('--download', dest='__download', action='store_true', default=False,
                         help='If true, items will be downloaded from MEGA')
 
-    parser.add_argument('--__upload', dest='__upload', action='store_true', default=False,
+    parser.add_argument('--upload', dest='__upload', action='store_true', default=False,
                         help='If true, items will be uploaded to MEGA')
 
-    parser.add_argument('--__removeRemote', dest='__removeRemote', action='store_true', default=False,
+    parser.add_argument('--removeRemote', dest='__removeRemote', action='store_true', default=False,
                         help='If true, this will allow for remote files to be removed.')
 
-    parser.add_argument('--__removeIncomplete', dest='__removeIncomplete', action='store_true', default=False,
+    parser.add_argument('--removeIncomplete', dest='__removeIncomplete', action='store_true', default=False,
                         help='If true, this will allow for local downloaded files that are incomplete to be removed.')
 
-    parser.add_argument('--__compressAll', dest='__compressAll', action='store_true', default=False,
+    parser.add_argument('--compressAll', dest='__compressAll', action='store_true', default=False,
                         help='If true, this will __compressAll local image and video files.')
 
-    parser.add_argument('--__compressImages', dest='__compressImages', action='store_true', default=False,
+    parser.add_argument('--compressImages', dest='__compressImages', action='store_true', default=False,
                         help='If true, this will __compressAll local image files.')
 
-    parser.add_argument('--__compressVideos', dest='__compressVideos', action='store_true', default=False,
+    parser.add_argument('--compressVideos', dest='__compressVideos', action='store_true', default=False,
                         help='If true, this will __compressAll local video files.')
 
-    parser.add_argument('--__downSpeed', dest='__downSpeed', type=int, default=None,
+    parser.add_argument('--downSpeed', dest='__downSpeed', type=int, default=None,
                         help='Total __download speed limit.')
 
-    parser.add_argument('--__upSpeed', dest='__upSpeed', type=int, default=None,
+    parser.add_argument('--upSpeed', dest='__upSpeed', type=int, default=None,
                         help='Total __upload speed limit.')
 
     parser.add_argument('--log', dest='__logLevel', default='INFO',

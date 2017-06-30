@@ -5,7 +5,7 @@
 ###
 
 from logging import getLogger
-from .megaManager_lib import MegaManager_Lib
+from .lib import Lib
 from os import chdir, path, remove, rename
 from re import findall, split, sub
 from random import randint
@@ -34,7 +34,7 @@ class MegaTools_Lib(object):
         self.__downSpeedLimit = downSpeedLimit
         self.__upSpeedLimit = upSpeedLimit
         self.__logLevel = logLevel
-        self.__lib = MegaManager_Lib(logLevel=logLevel)
+        self.__lib = Lib(logLevel=logLevel)
 
     def download_all_files_from_account(self, username, password, localRoot, remoteRoot):
         """

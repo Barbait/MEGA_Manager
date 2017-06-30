@@ -10,13 +10,12 @@ from os import chdir, kill, listdir, path
 from re import split, sub
 from signal import SIGTERM
 from subprocess import call, PIPE, Popen
-from tools import CompressImage
 
 __author__ = 'szmania'
 
 SCRIPT_DIR = path.dirname(path.realpath(__file__))
 
-class MegaManager_Lib(object):
+class Lib(object):
     def __init__(self, logLevel='DEBUG'):
         """
         MegaManager library.
@@ -26,32 +25,6 @@ class MegaManager_Lib(object):
         """
 
         self.__logLevel = logLevel
-
-    def compress_image_file(self, filePath):
-        """
-        Compress images file.
-    
-        :param filePath: File path of image to __compressAll.
-        :type filePath: string
-
-        :return: Boolean of whether compression operation was successful or not.
-        """
-    
-        logger = getLogger('megaManager_lib._compress_image_file')
-        logger.setLevel(self.__logLevel)
-    
-        logger.debug(' Compressing image file "%s".' % filePath)
-
-        compressImageObj = CompressImage()
-        result = compressImageObj.processfile(filename=filePath)
-
-        if result:
-            logger.debug(' Success, file "%s" compressed successfully.' % filePath)
-            return True
-        else:
-            logger.debug(' Error, file "%s" NOT compressed successfully!' % filePath)
-            return False
-
 
     def dump_list_into_file(self, itemList, filePath):
         """
@@ -90,7 +63,7 @@ class MegaManager_Lib(object):
             subprocess object
         """
     
-        logger = getLogger('MegaManager_Lib.exec_cmd')
+        logger = getLogger('Lib.exec_cmd')
         logger.setLevel(self.__logLevel)
     
         logger.debug(' Executing command: "%s"' % command)
@@ -167,7 +140,7 @@ class MegaManager_Lib(object):
             string: Size in MegaBytes converted from bytes.
         """
     
-        logger = getLogger('MegaManager_Lib.get_mb_size_from_bytes')
+        logger = getLogger('Lib.get_mb_size_from_bytes')
         logger.setLevel(self.__logLevel)
     
         logger.debug(' Converting kilobytes to megabytes.')
@@ -198,7 +171,7 @@ class MegaManager_Lib(object):
             string: Remote path.
         """
 
-        logger = getLogger('MegaManager_Lib.get_remote_path_from_local_path')
+        logger = getLogger('Lib.get_remote_path_from_local_path')
         logger.setLevel(self.__logLevel)
 
         logger.debug(' Getting remote path from local path')
@@ -242,7 +215,7 @@ class MegaManager_Lib(object):
         :return: List of items that contain subString.
         """
 
-        logger = getLogger('MegaManager_Lib.get_items_in_list_with_subString')
+        logger = getLogger('Lib.get_items_in_list_with_subString')
         logger.setLevel(self.__logLevel)
 
         subList = []
@@ -286,7 +259,7 @@ class MegaManager_Lib(object):
         :return: Lines in file as list.
         """
 
-        logger = getLogger('MegaManager_Lib.load_file_list_as_list')
+        logger = getLogger('Lib.load_file_list_as_list')
         logger.setLevel(self.__logLevel)
 
         logger.debug(' Loading %s filePath.' % filePath)
