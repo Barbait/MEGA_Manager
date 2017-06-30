@@ -15,18 +15,16 @@ __author__ = 'szmania'
 
 SCRIPT_DIR = path.dirname(path.realpath(__file__))
 
-
 class MegaManager_Lib(object):
-    def __init__(self, workingDir, logLevel='DEBUG'):
+    def __init__(self, logLevel='DEBUG'):
         """
-        :param workingDir: Working directory of megaManager script
-        :type workingDir: String.
-        :param logLevel: Logging level setting ie: "DEBUG" or "WARN"
-        :type logLevel: String.
+        MegaManager library.
+
+        Args:
+            logLevel (str): Logging level setting ie: "DEBUG" or "WARN"
         """
 
-        self.workingDir = workingDir
-        self.logLevel = logLevel
+        self.__logLevel = logLevel
 
     def compress_image_file(self, filePath):
         """
@@ -39,17 +37,9 @@ class MegaManager_Lib(object):
         """
     
         logger = getLogger('megaManager_lib._compress_image_file')
-        logger.setLevel(self.logLevel)
+        logger.setLevel(self.__logLevel)
     
         logger.debug(' Compressing image file "%s".' % filePath)
-    
-        # cmd = 'D:\\Python\\Python27\\python.exe "%s\\libs\\__compressImages\\__compressImages.py" --mode __compressAll "%s"' % (
-        #     self.workingDir, filePath)
-        # cmd = 'python "%s\\libs\\__compressImages\\__compressImages.py" --mode __compressAll "%s"' % (
-        #     self.workingDir, filePath)
-        # proc1 = self.exec_cmd(command=cmd, noWindow=True)
-        #
-        # return proc1
 
         compressImageObj = CompressImage()
         result = compressImageObj.processfile(filename=filePath)
@@ -75,7 +65,7 @@ class MegaManager_Lib(object):
         """
     
         logger = getLogger('MegaManager_lib.dump_list_into_file')
-        logger.setLevel(self.logLevel)
+        logger.setLevel(self.__logLevel)
     
         logger.debug(' Dumping list into %s filePath.' % filePath)
 
@@ -100,7 +90,7 @@ class MegaManager_Lib(object):
         """
     
         logger = getLogger('MegaManager_Lib.exec_cmd')
-        logger.setLevel(self.logLevel)
+        logger.setLevel(self.__logLevel)
     
         logger.debug(' Executing command: "%s"' % command)
     
@@ -114,7 +104,33 @@ class MegaManager_Lib(object):
             proc = call(command)
     
         return proc
-    
+
+    def exec_cmd_and_return_output(self, command, workingDir=None):
+        """
+        Execute given command and return stdout and stderr.
+
+        :param command: Command to execute.
+        :type command: String
+        :param workingDir: Working directory.
+        :type workingDir: String
+
+        :return: Tuple of output and error: stdout and stderr
+        """
+
+        logger = getLogger('MegaTools_Lib.exec_cmd')
+        logger.setLevel(self.__logLevel)
+
+        logger.debug(' Executing command: "%s"' % command)
+
+        if workingDir:
+            chdir(workingDir)
+
+        proc = Popen(command, stdout=PIPE, shell=True)
+
+        (out, err) = proc.communicate()
+
+        return out, err
+
     def get_mb_size_from_bytes(self, bytes):
         """
         Convert bytes to size in MegaBytes.
@@ -126,7 +142,7 @@ class MegaManager_Lib(object):
         """
     
         logger = getLogger('MegaManager.get_mb_size_from_bytes')
-        logger.setLevel(self.logLevel)
+        logger.setLevel(self.__logLevel)
     
         logger.debug(' Converting kilobytes to megabytes.')
     
@@ -152,7 +168,7 @@ class MegaManager_Lib(object):
             """
     
             logger = getLogger('megaManager_lib.get_sleep_time')
-            logger.setLevel(self.logLevel)
+            logger.setLevel(self.__logLevel)
     
             sleepTime = 0
     
@@ -171,7 +187,7 @@ class MegaManager_Lib(object):
         """
 
         logger = getLogger('MegaManager_Lib.get_items_in_list_with_subString')
-        logger.setLevel(self.logLevel)
+        logger.setLevel(self.__logLevel)
 
         subList = []
         for item in list:
@@ -190,7 +206,7 @@ class MegaManager_Lib(object):
         """
     
         logger = getLogger('megaManager_lib.kill_running_processes_with_name')
-        logger.setLevel(self.logLevel)
+        logger.setLevel(self.__logLevel)
     
         logger.info(' Killing processes with name "%s"' % procName)
         # p = Popen(['ps', '-a'], stdout=PIPE)
@@ -215,7 +231,7 @@ class MegaManager_Lib(object):
         """
 
         logger = getLogger('MegaManager_Lib.load_file_list_as_list')
-        logger.setLevel(self.logLevel)
+        logger.setLevel(self.__logLevel)
 
         logger.debug(' Loading %s filePath.' % filePath)
 
@@ -245,7 +261,7 @@ class MegaManager_Lib(object):
         """
     
         logger = getLogger('megaManager_lib.size_of_dir')
-        logger.setLevel(self.logLevel)
+        logger.setLevel(self.__logLevel)
     
         logger.debug(' Getting size of directory "%s"' % dirPath)
     

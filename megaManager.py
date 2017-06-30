@@ -96,7 +96,7 @@ class MegaManager(object):
             self._load_config_file()
 
             self.__ffmpeg = FFMPEG_Lib(ffmpegExePath=self.__ffmpegExePath, logLevel=self.__logLevel)
-            self.__lib = MegaManager_Lib(workingDir=WORKING_DIR, logLevel=self.__logLevel)
+            self.__lib = MegaManager_Lib(logLevel=self.__logLevel)
             self.__megaTools = MegaTools_Lib(megaToolsDir=self.__megaToolsDir, downSpeedLimit=self.__downSpeed,
                                              upSpeedLimit=self.__upSpeed, logLevel=self.__logLevel)
 
