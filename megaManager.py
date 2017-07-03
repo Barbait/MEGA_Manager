@@ -560,7 +560,7 @@ class MegaManager(object):
                     # test = split(':\d{2} ', line)
                     remote_type = line.split()[2]
                     if remote_type == '0':
-                        fileName, fileExt = path.splitext(split(':\d{2} ', line)[1])
+                        fileExt = path.splitext(split(':\d{2} ', line)[1])[1]
                         if fileExt in self.__compressionImageExtensions:
                             remote_filePath = split(':\d{2} ', line)[1]
                             file_subPath = sub(self.__remoteRoot, '', remote_filePath)
@@ -627,14 +627,14 @@ class MegaManager(object):
         # (out, err) = proc.communicate()
 
         lines = self.__megaTools.get_remote_file_data_recursively(username=username, password=password,
-                                                          remotePath=self.__remoteRoot)
+                                                                  remotePath=self.__remoteRoot)
 
         if lines:
             for line in lines:
                 if not line == '':
                     remote_type = line.split()[2]
                     if remote_type == '0':
-                        fileName, fileExt = path.splitext(split(':\d{2} ', line)[1])
+                        fileExt = path.splitext(split(':\d{2} ', line)[1])[1]
                         if fileExt in self.__compressionVideoExtensions:
                             remote_filePath = split(':\d{2} ', line)[1]
                             file_subPath = sub(self.__remoteRoot, '', remote_filePath)
@@ -655,9 +655,9 @@ class MegaManager(object):
                                                     break
                                                 except:
                                                     logger.debug(" Remove failed, retrying...")
-                                        returnCode = self.__ffmpeg.compress_video_file(local_filePath, targetPath=newFilePath, )
+                                        result = self.__ffmpeg.compress_video_file(local_filePath, targetPath=newFilePath, )
 
-                                        if returnCode == 0 and path.exists(newFilePath):
+                                        if result == True and path.exists(newFilePath):
                                             for retry in range(100):
                                                 try:
                                                     remove(local_filePath)

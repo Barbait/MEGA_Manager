@@ -67,20 +67,6 @@ class MegaTools_Lib(object):
             cmd = 'start "" /B megacopy --__download -u %s -p %s --local "%s" --remote "%s"' % (username, password, localRoot,remoteRoot)
 
         result = self.__lib.exec_cmd(command=cmd, workingDir=self.__megaToolsDir, noWindow=True, outputFile=self.__megaTools_log)
-        # logger.debug(' Executing: %s \n' % (cmd))
-        #
-        # while not proc.poll():
-        #     err = proc.stderr.readline()
-        #
-        #     if not err:
-        #         break
-        #     logFile.write('%s - %s: %s' % (username, password, err))
-        #     temp_logFile_stderr.write('%s - %s: %s' % (username, password, err))
-        #
-        # output = proc.communicate()[0]
-        # exitCode = proc.returncode
-        # temp_logFile_stderr.close()
-        # logFile.close()
 
         if result:
             logger.debug(' Success, downloadeded all files from account.')
@@ -119,6 +105,55 @@ class MegaTools_Lib(object):
             logger.debug(' Error when trying to download file.')
             return False
 
+    def extract_file_extension_from_megals_line_data(self, line):
+        """
+        Extract file extension from megals line data output.
+        example input:
+        udtDgR7I    Xz2tWWB5Dmo 0    4405067776 2013-04-10 19:16:02 /Root/bigfile
+
+        Args:
+            line (str): line to extract file extension from.
+
+        Returns:
+            string: File extension. ie: "jpg"
+        """
+
+        logger = getLogger('MegaTools_Lib.extract_file_extension_from_megals_line_data')
+        logger.setLevel(self.__logLevel)
+
+        logger.debug(' Extracting file extension from "%s"' % line)
+        fileExt = None
+        try:
+            fileExt = path.splitext(split(':\d{2} ', line)[1])[1]
+        except Exception as e:
+            logger.error('Exception: %s' % str(e))
+        finally:
+            return fileExt
+
+    def extract_file_type_from_megals_line_data(self, line):
+        """
+        Extract file type from megals line data output.
+        example input:
+        udtDgR7I    Xz2tWWB5Dmo 0    4405067776 2013-04-10 19:16:02 /Root/bigfile
+
+        Args:
+            line (str): line to extract file extension from.
+
+        Returns:
+            string: File type as integer. 0 = file, 1 = directory, 2 = MEGA account system file ie: "/Root".
+        """
+
+        logger = getLogger('MegaTools_Lib.extract_file_extension_from_megals_line_data')
+        logger.setLevel(self.__logLevel)
+
+        logger.debug(' Extracting file extension from "%s"' % line)
+        fileExt = None
+        try:
+            fileExt = path.splitext(split(':\d{2} ', line)[1])[1]
+        except Exception as e:
+            logger.error('Exception: %s' % str(e))
+        finally:
+            return fileExt
 
     def get_account_free_space(self, username, password):
         """
