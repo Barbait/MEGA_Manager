@@ -68,22 +68,25 @@ class Lib(object):
     
         logger.debug(' Executing command: "%s"' % command)
 
-        outFile = open(outputFile, 'a')
+        if outputFile:
+            outFile = open(outputFile, 'a')
+        else:
+            outFile=None
 
         if workingDir:
             chdir(workingDir)
 
         if noWindow:
             CREATE_NO_WINDOW = 0x08000000
-            proc = call(command, stdout=outFile, stderr=outFile, creationflags=CREATE_NO_WINDOW)
+            exitCode = call(command, stdout=outFile, stderr=outFile, creationflags=CREATE_NO_WINDOW)
         else:
-            proc = call(command)
+            exitCode = call(command,  stdout=outFile, stderr=outFile)
     
-        while not proc.poll():
-            pass
+        # while not proc.poll():
+        #     pass
 
-        outFile.close()
-        exitCode = proc.returnCode()
+        # outFile.close()
+        # exitCode = proc.returnCode()
 
         if exitCode == 0:
             logger.debug(' Successfully executed command "%s".' % command)
@@ -113,9 +116,9 @@ class Lib(object):
         if workingDir:
             chdir(workingDir)
 
-        outFile = open(outputFile, 'a')
         try:
-            if outFile:
+            if outputFile:
+                outFile = open(outputFile, 'a')
                 proc = Popen(command, stdout=outputFile, stderr=outFile)
             else:
                 proc = Popen(command, stdout=PIPE, shell=True)
@@ -125,7 +128,8 @@ class Lib(object):
             logger.warning(' Exception: %s' % str(e))
             return None, None
         finally:
-            outFile.close()
+            if outputFile:
+                outFile.close()
 
         return out, err
 

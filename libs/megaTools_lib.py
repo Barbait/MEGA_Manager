@@ -14,12 +14,12 @@ from tempfile import gettempdir
 
 __author__ = 'szmania'
 
-MEGATOOLS_LOG = '__megaTools.log'
+MEGATOOLS_LOG = 'megaTools.log'
 TEMP_LOGFILE_PATH = gettempdir() + '\\megaManager_error_files_%d.tmp' % randint(0, 9999999999)
 SCRIPT_DIR = path.dirname(path.realpath(__file__))
 
 class MegaTools_Lib(object):
-    def __init__(self, megaToolsDir, downSpeedLimit=None, upSpeedLimit=None, logLevel='DEBUG'):
+    def __init__(self, megaToolsDir, downSpeedLimit=None, upSpeedLimit=None, logLevel='DEBUG', logFilePath=MEGATOOLS_LOG):
         """
         Library for interaction with MegaTools. A tool suite for MEGA.
 
@@ -29,11 +29,12 @@ class MegaTools_Lib(object):
             upSpeedLimit (int): Max __upload speed limit.
             logLevel (str): Logging level setting ie: "DEBUG" or "WARN"
         """
-        self.__megaTools_log = MEGATOOLS_LOG
         self.__megaToolsDir = megaToolsDir
         self.__downSpeedLimit = downSpeedLimit
         self.__upSpeedLimit = upSpeedLimit
         self.__logLevel = logLevel
+        self.__megaTools_log = logFilePath
+
         self.__lib = Lib(logLevel=logLevel)
 
     def download_all_files_from_account(self, username, password, localRoot, remoteRoot):
@@ -71,7 +72,7 @@ class MegaTools_Lib(object):
         # while not proc.poll():
         #     err = proc.stderr.readline()
         #
-        #     if err == '':
+        #     if not err:
         #         break
         #     logFile.write('%s - %s: %s' % (username, password, err))
         #     temp_logFile_stderr.write('%s - %s: %s' % (username, password, err))
@@ -200,7 +201,7 @@ class MegaTools_Lib(object):
 
         if remotePath:
 
-            cmd = 'start /B megals -lnR -u %s -p %s "%s"' % (username, password, remotePath)
+            cmd = 'start /B megals -lR -u %s -p %s "%s"' % (username, password, remotePath)
             out, err = self.__lib.exec_cmd_and_return_output(command=cmd, workingDir=self.__megaToolsDir)
 
             lines = out.split('\r\n')
@@ -249,6 +250,34 @@ class MegaTools_Lib(object):
                 dirList.append(sub('/', '', dirName))
 
         return dirList
+
+    def get_remote_file_data_recursively(self, username, password, remotePath='/'):
+        """
+        Get all remote file data as list. This includes file path, modified date/time, file size, file type (file or dir),
+
+        Args:
+            username (str): username of MEGA account.
+            password (str): password of MEGA account.
+            remotePath (str): root path to get remote files from.
+        Returns:
+            list of remote file data in given remotePath.
+        """
+
+        logger = getLogger('MegaTools_Lib.get_remote_file_data_recursively')
+        logger.setLevel(self.__logLevel)
+
+        cmd = 'megals -lR -u %s -p %s "%s"' % (username, password, remotePath)
+
+        out, err = self.__lib.exec_cmd_and_return_output(command=cmd, workingDir=self.__megaToolsDir)
+
+        if not err:
+            if not out == '':
+                lines = out.split('\r\n')
+                logger.debug(' Success, could get remote file data recursievly.')
+                return lines
+
+        logger.warning(str(err))
+        return None
 
     def get_remote_file_modified_date(self, username, password, localFilePath, localRoot, remoteRoot):
         """
@@ -309,7 +338,7 @@ class MegaTools_Lib(object):
                                                                 remoteRoot=remoteRoot)
         if remotePath:
 
-            cmd = 'start /B megals -ln -u %s -p %s "%s"' % (username, password, remotePath)
+            cmd = 'megals -ln -u %s -p %s "%s"' % (username, password, remotePath)
             out, err = self.__lib.exec_cmd_and_return_output(command=cmd, workingDir=self.__megaToolsDir)
 
             line_split = out.split()
@@ -320,7 +349,7 @@ class MegaTools_Lib(object):
 
         return None
 
-    def get_remote_files(self, username, password, remotePath='/'):
+    def get_remote_file_paths_recursively(self, username, password, remotePath='/'):
         """
         Get remote files list.
 
@@ -332,21 +361,21 @@ class MegaTools_Lib(object):
             list of remote files in given remotePath.
         """
 
-        logger = getLogger('MegaTools_Lib.get_remote_file_size')
+        logger = getLogger('MegaTools_Lib.get_remote_file_paths_recursively')
         logger.setLevel(self.__logLevel)
 
         cmd = 'megals -R -u %s -p %s "%s"' % (username, password, remotePath)
 
         out, err = self.__lib.exec_cmd_and_return_output(command=cmd, workingDir=self.__megaToolsDir)
 
-        if err == '':
+        if not err:
             if not out == '':
                 lines = out.split('\r\n')
                 remoteFiles = []
                 for line in lines:
                     if not line == '' and len(findall("\?", line)) == 0:
                         remoteFiles.append(line)
-                logger.debug(' Success, could get remote sub directory names.')
+                logger.debug(' Success, could get remote file paths.')
                 return remoteFiles
 
         logger.warning(str(err))
@@ -373,7 +402,7 @@ class MegaTools_Lib(object):
         cmd = 'start /B megals -n -u %s -p %s "%s"' % (username, password, remote_root)
         out, err = self.__lib.exec_cmd_and_return_output(command=cmd, workingDir=self.__megaToolsDir)
 
-        if err == '':
+        if not err:
             if not out == '':
                 lines = out.split('\r\n')
                 logger.debug(' Success, could get remote sub directory names.')
@@ -401,7 +430,7 @@ class MegaTools_Lib(object):
         cmd = 'start /B megals -ln -u %s -p %s' % (username, password)
         out, err = self.__lib.exec_cmd_and_return_output(command=cmd, workingDir=self.__megaToolsDir)
 
-        if err == '':
+        if not err:
             if not out == '':
                 lines = out.split('\r\n')
                 for line in lines:
@@ -494,7 +523,7 @@ class MegaTools_Lib(object):
         # lines = out.split('\r\n')
         # logFile.close()
 
-        if err == '':
+        if not err:
             logger.debug(' Success, uploaded local dir.')
             return True
 
@@ -525,7 +554,7 @@ class MegaTools_Lib(object):
         cmd = 'megals -ln -u %s -p %s "%s"' % (username, password, remoteRoot)
         out, err = self.__lib.exec_cmd_and_return_output(command=cmd, workingDir=self.__megaToolsDir, outputFile=self.__megaTools_log)
 
-        if err == '':
+        if not err:
             lines = out.split('\r\n')
             for line in lines:
                 if not line == '':

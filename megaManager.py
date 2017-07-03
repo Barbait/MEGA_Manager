@@ -10,7 +10,7 @@
 
 from argparse import ArgumentParser
 from logging import DEBUG, getLogger, FileHandler, Formatter, StreamHandler
-from libs import FFMPEG_Lib, Lib, MegaTools_Lib
+from libs import CompressImages_Lib, FFMPEG_Lib, Lib, MegaTools_Lib
 from os import chdir, getpid, path, remove, rename, walk
 from psutil import IDLE_PRIORITY_CLASS, Process
 from random import randint
@@ -20,7 +20,7 @@ from subprocess import call, PIPE, Popen
 from sys import stdout
 from tempfile import gettempdir
 from threading import Thread
-from time import sleep, time
+from time import time
 
 
 __author__ = 'szmania'
@@ -95,6 +95,7 @@ class MegaManager(object):
             self._setup_logger(self.__megaManager_logFilePath)
             self._load_config_file()
 
+            self.__compressImages_lib = CompressImages_Lib(logLevel=self.__logLevel)
             self.__ffmpeg = FFMPEG_Lib(ffmpegExePath=self.__ffmpegExePath, logLevel=self.__logLevel)
             self.__lib = Lib(logLevel=self.__logLevel)
             self.__megaTools = MegaTools_Lib(megaToolsDir=self.__megaToolsDir, downSpeedLimit=self.__downSpeed,
@@ -115,7 +116,7 @@ class MegaManager(object):
         """
 
         for key, value in kwargs.items():
-            setattr(self, '__%s' % key, value)
+            setattr(self, '_MegaManager__%s' % key, value)
 
     def _setup_logger(self, logFile):
         """
@@ -433,8 +434,8 @@ class MegaManager(object):
         localRoot_adj = sub('\\\\', '/', self.__localRoot)
         chdir('%s' % self.__megaToolsDir)
 
-        remoteFiles = self.__megaTools.get_remote_files(username=username, password=password,
-                                                        remotePath=self.__remoteRoot)
+        remoteFiles = self.__megaTools.get_remote_file_paths_recursively(username=username, password=password,
+                                                                         remotePath=self.__remoteRoot)
 
         dontExistLocally = []
         for remote_filePath in remoteFiles:
@@ -529,17 +530,11 @@ class MegaManager(object):
 
     def _find_image_files_to_compress(self, username, password):
         """
-        Find image files to __compressAll.
+        Find image files to compress.
 
-        :param username: Username of account to find local images for.
-        :type username: String.
-        :param password: Password of account to find local images for.
-        :type password: String.
-        :param self.__remoteRoot: Remote path to iterate through.
-        :type self.__remoteRoot: String.
-
-        :return:
-        :type:
+        Args:
+            username (str): Username of account to find local images for.
+            password (str): Password of account to find local images for.
         """
 
         logger = getLogger('MegaManager._find_image_files_to_compress')
@@ -548,59 +543,66 @@ class MegaManager(object):
         logger.debug(' Compressing image files.')
 
         localRoot_adj = sub('\\\\', '/', self.__localRoot)
-        chdir('%s' % self.__megaToolsDir)
+        # chdir('%s' % self.__megaToolsDir)
 
-        cmd = 'megals -lnR -u %s -p %s "%s"' % (username, password, self.__remoteRoot)
-        proc = Popen(cmd, stdout=PIPE, shell=True)
+        # cmd = 'megals -lR -u %s -p %s "%s"' % (username, password, self.__remoteRoot)
+        # proc = Popen(cmd, stdout=PIPE, shell=True)
 
-        (out, err) = proc.communicate()
-        lines = out.split('\r\n')
-        for line in lines:
-            if not line == '':
-                # test = split(':\d{2} ', line)
-                remote_type = line.split()[2]
-                if remote_type == '0':
-                    fileName, fileExt = path.splitext(split(':\d{2} ', line)[1])
-                    if fileExt in self.__compressionImageExtensions:
-                        remote_filePath = split(':\d{2} ', line)[1]
-                        file_subPath = sub(self.__remoteRoot, '', remote_filePath)
+        # (out, err) = proc.communicate()
+        # lines = out.split('\r\n')
 
-                        if file_subPath is not '':
-                            local_filePath = localRoot_adj + file_subPath
+        lines = self.__megaTools.get_remote_file_data_recursively(username=username, password=password,
+                                                          remotePath=self.__remoteRoot)
 
-                            if (path.exists(local_filePath)):
-                                if (local_filePath not in self.__compressedImageFiles) and (local_filePath not in self.__unableToCompressImageFiles):
-                                    result = self.__lib.compress_image_file(filePath=local_filePath)
-                                    if result:
-                                        compressPath_backup = local_filePath + '.compressimages-backup'
-                                        if path.exists(compressPath_backup):
-                                            logger.debug(' File compressed successfully "%s"!' % local_filePath)
-                                            try:
-                                                remove(compressPath_backup)
-                                            except WindowsError as e:
-                                                logger.warning(' Exception: %s' % str(e))
-                                                pass
+        if lines:
+            for line in lines:
+                if not line == '':
+                    # test = split(':\d{2} ', line)
+                    remote_type = line.split()[2]
+                    if remote_type == '0':
+                        fileName, fileExt = path.splitext(split(':\d{2} ', line)[1])
+                        if fileExt in self.__compressionImageExtensions:
+                            remote_filePath = split(':\d{2} ', line)[1]
+                            file_subPath = sub(self.__remoteRoot, '', remote_filePath)
 
-                                            self.compressedFiles = []
-                                            self.compressedFiles.append(local_filePath)
-                                            self.__lib.dump_list_into_file(itemList=self.__compressedImageFiles, filePath=self.__compressedImagesFilePath, )
+                            if file_subPath is not '':
+                                local_filePath = localRoot_adj + file_subPath
+
+                                if (path.exists(local_filePath)):
+                                    if (local_filePath not in self.__compressedImageFiles) and (local_filePath not in self.__unableToCompressImageFiles):
+                                        result = self.__compressImages_lib.compress_image_file(filePath=local_filePath)
+                                        if result:
+                                            compressPath_backup = local_filePath + '.compressimages-backup'
+                                            if path.exists(compressPath_backup):
+                                                logger.debug(' File compressed successfully "%s"!' % local_filePath)
+                                                try:
+                                                    remove(compressPath_backup)
+                                                except WindowsError as e:
+                                                    logger.warning(' Exception: %s' % str(e))
+                                                    pass
+
+                                                self.compressedFiles = []
+                                                self.compressedFiles.append(local_filePath)
+                                                self.__lib.dump_list_into_file(itemList=self.__compressedImageFiles, filePath=self.__compressedImagesFilePath, )
+
+                                            else:
+                                                logger.debug(' File cannot be compressed any further "%s"!' % local_filePath)
+                                                self.__unableToCompressImageFiles.append(local_filePath)
+                                                self.__lib.dump_list_into_file(itemList=self.__unableToCompressImageFiles, filePath=self.__unableToCompressImagesFilePath, )
 
                                         else:
-                                            logger.debug(' File cannot be compressed any further "%s"!' % local_filePath)
+                                            logger.debug(' Error, image file could not be compressed "%s"!' % local_filePath)
                                             self.__unableToCompressImageFiles.append(local_filePath)
-                                            self.__lib.dump_list_into_file(itemList=self.__unableToCompressImageFiles, filePath=self.__unableToCompressImagesFilePath, )
+                                            self.__lib.dump_list_into_file(itemList=self.__unableToCompressImageFiles,
+                                                                           filePath=self.__unableToCompressImagesFilePath)
+
 
                                     else:
-                                        logger.debug(' Error, image file could not be compressed "%s"!' % local_filePath)
-                                        self.__unableToCompressImageFiles.append(local_filePath)
-                                        self.__lib.dump_list_into_file(itemList=self.__unableToCompressImageFiles,
-                                                                       filePath=self.__unableToCompressImagesFilePath)
-
-
+                                        logger.debug(' Error, image file previously processed. Moving on.  "%s"!' % local_filePath)
                                 else:
-                                    logger.debug(' Error, image file previously processed. Moving on.  "%s"!' % local_filePath)
-                            else:
-                                logger.debug(' Error, image file does NOT exist locally. Moving on.  "%s"!' % local_filePath)
+                                    logger.debug(' Error, image file does NOT exist locally. Moving on.  "%s"!' % local_filePath)
+        else:
+            logger.debug(' Error, could not get remote file data.')
 
     def _find_video_files_to_compress(self, username, password):
         """
@@ -617,80 +619,85 @@ class MegaManager(object):
         logger.debug(' Finding video files to compress.')
 
         localRoot_adj = sub('\\\\', '/', self.__localRoot)
-        chdir('%s' % self.__megaToolsDir)
+        # chdir('%s' % self.__megaToolsDir)
 
-        cmd = 'megals -lnR -u %s -p %s "%s"' % (username, password, self.__remoteRoot)
-        proc = Popen(cmd, stdout=PIPE, shell=True)
+        # cmd = 'megals -lR -u %s -p %s "%s"' % (username, password, self.__remoteRoot)
+        # proc = Popen(cmd, stdout=PIPE, shell=True)
+        #
+        # (out, err) = proc.communicate()
 
-        (out, err) = proc.communicate()
-        lines = out.split('\r\n')
+        lines = self.__megaTools.get_remote_file_data_recursively(username=username, password=password,
+                                                          remotePath=self.__remoteRoot)
 
-        for line in lines:
-            if not line == '':
-                remote_type = line.split()[2]
-                if remote_type == '0':
-                    fileName, fileExt = path.splitext(split(':\d{2} ', line)[1])
-                    if fileExt in self.___compressionVideoExtensions:
-                        remote_filePath = split(':\d{2} ', line)[1]
-                        file_subPath = sub(self.__remoteRoot, '', remote_filePath)
+        if lines:
+            for line in lines:
+                if not line == '':
+                    remote_type = line.split()[2]
+                    if remote_type == '0':
+                        fileName, fileExt = path.splitext(split(':\d{2} ', line)[1])
+                        if fileExt in self.__compressionVideoExtensions:
+                            remote_filePath = split(':\d{2} ', line)[1]
+                            file_subPath = sub(self.__remoteRoot, '', remote_filePath)
 
-                        if file_subPath is not '':
-                            local_filePath = localRoot_adj + file_subPath
+                            if file_subPath is not '':
+                                local_filePath = localRoot_adj + file_subPath
 
-                            if path.isfile(local_filePath):
-                                if (local_filePath not in self.__compressedVideoFiles) \
-                                        and (local_filePath not in self.__unableToCompressVideoFiles):
+                                if path.isfile(local_filePath):
+                                    if (local_filePath not in self.__compressedVideoFiles) \
+                                            and (local_filePath not in self.__unableToCompressVideoFiles):
 
-                                    newFilePath = local_filePath.rsplit(".", 1)[0] + '_NEW.mp4'
+                                        newFilePath = local_filePath.rsplit(".", 1)[0] + '_NEW.mp4'
 
-                                    if path.exists(newFilePath):
-                                        for retry in range(100):
-                                            try:
-                                                remove(newFilePath)
-                                                break
-                                            except:
-                                                logger.debug(" Remove failed, retrying...")
-                                    returnCode = self.__ffmpeg.compress_video_file(local_filePath, targetPath=newFilePath, )
+                                        if path.exists(newFilePath):
+                                            for retry in range(100):
+                                                try:
+                                                    remove(newFilePath)
+                                                    break
+                                                except:
+                                                    logger.debug(" Remove failed, retrying...")
+                                        returnCode = self.__ffmpeg.compress_video_file(local_filePath, targetPath=newFilePath, )
 
-                                    if returnCode == 0 and path.exists(newFilePath):
-                                        for retry in range(100):
-                                            try:
-                                                remove(local_filePath)
-                                                break
-                                            except:
-                                                logger.debug(" Remove failed, retrying...")
+                                        if returnCode == 0 and path.exists(newFilePath):
+                                            for retry in range(100):
+                                                try:
+                                                    remove(local_filePath)
+                                                    break
+                                                except:
+                                                    logger.debug(" Remove failed, retrying...")
 
-                                        for retry in range(100):
-                                            try:
-                                                rename(newFilePath, sub('_NEW', '', newFilePath))
-                                                break
-                                            except:
-                                                logger.debug(" Rename failed, retrying...")
+                                            for retry in range(100):
+                                                try:
+                                                    rename(newFilePath, sub('_NEW', '', newFilePath))
+                                                    break
+                                                except:
+                                                    logger.debug(" Rename failed, retrying...")
 
-                                        logger.debug(' Video file compressed successfully "%s" into "%s"!' % (local_filePath, newFilePath))
-                                        self.__compressedVideoFiles.append(newFilePath)
-                                        self.__lib.dump_list_into_file(itemList=self.__compressedVideoFiles,
-                                                                       filePath=COMPRESSED_VIDEOS_FILE, )
+                                            logger.debug(' Video file compressed successfully "%s" into "%s"!' % (local_filePath, newFilePath))
+                                            self.__compressedVideoFiles.append(newFilePath)
+                                            self.__lib.dump_list_into_file(itemList=self.__compressedVideoFiles,
+                                                                           filePath=COMPRESSED_VIDEOS_FILE, )
 
-                                    elif path.exists(newFilePath):
-                                        remove(newFilePath)
+                                        elif path.exists(newFilePath):
+                                            remove(newFilePath)
+
+                                        else:
+                                            logger.debug(' Error, video file could not be compressed "%s"!' % local_filePath)
 
                                     else:
-                                        logger.debug(' Error, video file could not be compressed "%s"!' % local_filePath)
+                                        logger.debug(' Error, video file previously processed. Moving on. "%s"!' % local_filePath)
 
                                 else:
-                                    logger.debug(' Error, video file previously processed. Moving on. "%s"!' % local_filePath)
+                                    logger.debug(
+                                        ' Error, local video file doesnt exist: "%s"!' % local_filePath)
 
-                            else:
-                                logger.debug(
-                                    ' Error, local video file doesnt exist: "%s"!' % local_filePath)
+        else:
+            logger.error(' Error, could not get remote file details')
+            return False
 
     def _create_mega_accounts_data_file(self):
         """
         Create self.__megaAccountsOutputPath file. File that has all fetched data of accounts and local and remote spaces of each account.
 
-        :return:
-        :type:
         """
 
         logger = getLogger('MegaManager._create_mega_accounts_data_file')
@@ -739,15 +746,9 @@ class MegaManager(object):
         """
         Creats dictionary of account data (remote size, local size, etc...) for self.__megaAccountsOutputPath file.
 
-        :param username: Username of account to get data for 
-        :type username: String
-        :param password: Passworde of account to get data for 
-        :type password: String
-        :param self.__remoteRoot: Remote path of account to get data for.
-        :type self.__remoteRoot: String
-
-        :return:
-        :type:
+        Args:
+            username (str): username of account to find local video files for
+            password (str): password of account to find local video files for
         """
 
         logger = getLogger('MegaManager._get_account_details')
@@ -765,38 +766,45 @@ class MegaManager(object):
 
         subDirs = self.__megaTools.get_remote_subdir_names_only(username=username, password=password, remotePath=self.__remoteRoot)
 
-
         directoryLines = []
         totalLocalSize = 0
 
+        if subDirs:
+            for line in subDirs:
+                localDirSize = 0
+                localDirPath = self.__localRoot + '\\' + line
+                # remoteDirPath = self.__lib.get_remote_path_from_local_path(localPath=localDirPath, localRoot=self.__localRoot, remoteRoot=self.__remoteRoot)
 
-        for line in subDirs:
-            localDirSize = 0
-            localDirPath = self.__localRoot + '\\' + line
-            remoteDirSize, remoteDirPath = self.__megaTools.get_remote_dir_size(username, password, localDirPath, localRoot=self.__localRoot, remoteRoot=self.__remoteRoot)
+                if path.exists(localDirPath) and not line == '':
+                    # localDirSize = path.getsize(localDirPath)
+                    for r, d, f in walk(localDirPath):
+                        for file in f:
+                            filePath = path.join(r, file)
+                            if path.exists(filePath):
+                                localDirSize = localDirSize + path.getsize(filePath)
 
-            if path.exists(localDirPath) and not line == '':
-                # localDirSize = path.getsize(localDirPath)
-                for r, d, f in walk(localDirPath):
-                    for file in f:
-                        filePath = path.join(r, file)
-                        if path.exists(filePath):
-                            localDirSize = localDirSize + path.getsize(filePath)
+                    totalLocalSize = totalLocalSize + localDirSize
+                    remoteDirSize = self.__megaTools.get_remote_dir_size(username, password, localDirPath,
+                                                                         localRoot=self.__localRoot,
+                                                                         remoteRoot=self.__remoteRoot)
 
-                totalLocalSize = totalLocalSize + localDirSize
-                directoryLines.append(line + ' (%s remote, %s local)\n' % (self.__lib.get_mb_size_from_bytes(int(remoteDirSize)), self.__lib.get_mb_size_from_bytes(int(localDirSize))))
+                    directoryLines.append(line +
+                                          ' (%s remote, %s local)\n' % (self.__lib.get_mb_size_from_bytes(int(remoteDirSize)), self.__lib.get_mb_size_from_bytes(int(localDirSize))))
 
-            elif not line == '':
-                directoryLines.append(line + ' (%s remote, NONE local)\n' % (self.__lib.get_mb_size_from_bytes(int(remoteDirSize))))
+                elif not line == '':
+                    directoryLines.append(line + ' (%s remote, NONE local)\n' % (self.__lib.get_mb_size_from_bytes(int(remoteDirSize))))
 
-        accountDetails.append('LOCAL SIZE: %s \n' % self.__lib.get_mb_size_from_bytes(totalLocalSize))
+            accountDetails.append('LOCAL SIZE: %s \n' % self.__lib.get_mb_size_from_bytes(totalLocalSize))
 
-        for line in directoryLines:
-            accountDetails.append(line)
-        accountDetails.append('\n')
-        accountDetails.append('\n')
+            for line in directoryLines:
+                accountDetails.append(line)
+            accountDetails.append('\n')
+            accountDetails.append('\n')
 
-        self.__accounts_details_dict[username] = accountDetails
+            self.__accounts_details_dict[username] = accountDetails
+        else:
+            logger.error(' Error, could not get remote directory names!')
+            return False
 
     def _tear_down(self):
         """
@@ -820,7 +828,7 @@ class MegaManager(object):
             self.__lib.kill_running_processes_with_name('megacopy.exe')
             self.__lib.kill_running_processes_with_name('megals.exe')
             self.__lib.kill_running_processes_with_name('megadf.exe')
-            self.__lib.kill_running_processes_with_name('__ffmpeg.exe')
+            self.__lib.kill_running_processes_with_name('ffmpeg.exe')
 
         except Exception as e:
             logger.debug(' Exception: %s' % str(e))
@@ -837,34 +845,34 @@ def get_args():
 
     parser = ArgumentParser(description='MEGA Manager is a MEGA cloud storage management and optimization application.')
 
-    parser.add_argument('--download', dest='__download', action='store_true', default=False,
+    parser.add_argument('--download', dest='download', action='store_true', default=False,
                         help='If true, items will be downloaded from MEGA')
 
-    parser.add_argument('--upload', dest='__upload', action='store_true', default=False,
+    parser.add_argument('--upload', dest='upload', action='store_true', default=False,
                         help='If true, items will be uploaded to MEGA')
 
-    parser.add_argument('--removeRemote', dest='__removeRemote', action='store_true', default=False,
+    parser.add_argument('--removeRemote', dest='removeRemote', action='store_true', default=False,
                         help='If true, this will allow for remote files to be removed.')
 
-    parser.add_argument('--removeIncomplete', dest='__removeIncomplete', action='store_true', default=False,
+    parser.add_argument('--removeIncomplete', dest='removeIncomplete', action='store_true', default=False,
                         help='If true, this will allow for local downloaded files that are incomplete to be removed.')
 
-    parser.add_argument('--compressAll', dest='__compressAll', action='store_true', default=False,
-                        help='If true, this will __compressAll local image and video files.')
+    parser.add_argument('--compressAll', dest='compressAll', action='store_true', default=False,
+                        help='If true, this will compressAll local image and video files.')
 
-    parser.add_argument('--compressImages', dest='__compressImages', action='store_true', default=False,
-                        help='If true, this will __compressAll local image files.')
+    parser.add_argument('--compressImages', dest='compressImages', action='store_true', default=False,
+                        help='If true, this will compressAll local image files.')
 
-    parser.add_argument('--compressVideos', dest='__compressVideos', action='store_true', default=False,
+    parser.add_argument('--compressVideos', dest='compressVideos', action='store_true', default=False,
                         help='If true, this will __compressAll local video files.')
 
-    parser.add_argument('--downSpeed', dest='__downSpeed', type=int, default=None,
-                        help='Total __download speed limit.')
+    parser.add_argument('--downSpeed', dest='downSpeed', type=int, default=None,
+                        help='Total download speed limit.')
 
-    parser.add_argument('--upSpeed', dest='__upSpeed', type=int, default=None,
-                        help='Total __upload speed limit.')
+    parser.add_argument('--upSpeed', dest='upSpeed', type=int, default=None,
+                        help='Total upload speed limit.')
 
-    parser.add_argument('--log', dest='__logLevel', default='INFO',
+    parser.add_argument('--log', dest='logLevel', default='INFO',
                         help='Set logging level')
 
     args = parser.parse_args()
