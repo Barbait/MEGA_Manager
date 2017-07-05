@@ -130,6 +130,31 @@ class MegaTools_Lib(object):
         finally:
             return fileExt
 
+    def extract_file_path_from_megals_line_data(self, line):
+        """
+        Extract file path from megals line data output.
+        example input:
+        udtDgR7I    Xz2tWWB5Dmo 0    4405067776 2013-04-10 19:16:02 /Root/bigfile
+
+        Args:
+            line (str): line to extract file path from.
+
+        Returns:
+            string: File path. ie: "/Root".
+        """
+
+        logger = getLogger('MegaTools_Lib.extract_file_type_from_megals_line_data')
+        logger.setLevel(self.__logLevel)
+
+        logger.debug(' Extracting file path from "%s"' % line)
+        remote_filePath = None
+        try:
+            remote_filePath = split(':\d{2} ', line)[1]
+        except Exception as e:
+            logger.error('Exception: %s' % str(e))
+        finally:
+            return remote_filePath
+
     def extract_file_type_from_megals_line_data(self, line):
         """
         Extract file type from megals line data output.
@@ -137,23 +162,23 @@ class MegaTools_Lib(object):
         udtDgR7I    Xz2tWWB5Dmo 0    4405067776 2013-04-10 19:16:02 /Root/bigfile
 
         Args:
-            line (str): line to extract file extension from.
+            line (str): line to extract file type from.
 
         Returns:
             string: File type as integer. 0 = file, 1 = directory, 2 = MEGA account system file ie: "/Root".
         """
 
-        logger = getLogger('MegaTools_Lib.extract_file_extension_from_megals_line_data')
+        logger = getLogger('MegaTools_Lib.extract_file_type_from_megals_line_data')
         logger.setLevel(self.__logLevel)
 
-        logger.debug(' Extracting file extension from "%s"' % line)
-        fileExt = None
+        logger.debug(' Extracting file type from "%s"' % line)
+        remote_type = None
         try:
-            fileExt = path.splitext(split(':\d{2} ', line)[1])[1]
+            remote_type = line.split()[2]
         except Exception as e:
             logger.error('Exception: %s' % str(e))
         finally:
-            return fileExt
+            return remote_type
 
     def get_account_free_space(self, username, password):
         """
@@ -211,6 +236,34 @@ class MegaTools_Lib(object):
             logger.debug(' Success, could get account free space.')
             return usedSpace
         logger.debug(' Error, could NOT get account free space!')
+        return None
+
+    def get_account_total_space(self, username, password):
+        """
+        Get account total space in gigabytes
+
+        Args:
+            username (str): username for MEGA account
+            password (str): password for MEGA account
+
+        Returns:
+             int: Total space of account in gigabytes.
+        """
+
+        logger = getLogger('MegaTools_Lib.get_account_total_space')
+        logger.setLevel(self.__logLevel)
+
+        cmd = 'start /B megadf --total -h --gb -u %s -p %s' % (username, password)
+        out, err = self.__lib.exec_cmd_and_return_output(command=cmd, workingDir=self.__megaToolsDir)
+
+        if err:
+            logger.info(str(err))
+
+        if not out == '':
+            totalSpace = sub('\r', '', out)
+            logger.debug(' Success, could get account total space.')
+            return totalSpace
+        logger.debug(' Error, could NOT get account total space!')
         return None
 
     def get_remote_dir_size(self, username, password, localDirPath, localRoot, remoteRoot):

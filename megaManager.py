@@ -8,6 +8,7 @@
 # Pep8 compliant.
 ###
 
+from account import Account
 from argparse import ArgumentParser
 from logging import DEBUG, getLogger, FileHandler, Formatter, StreamHandler
 from libs import CompressImages_Lib, FFMPEG_Lib, Lib, MegaTools_Lib
@@ -16,7 +17,7 @@ from psutil import IDLE_PRIORITY_CLASS, Process
 from random import randint
 from re import findall, split, sub
 from shutil import copyfile
-from subprocess import call, PIPE, Popen
+from syncprofile import SyncProfile
 from sys import stdout
 from tempfile import gettempdir
 from threading import Thread
@@ -75,6 +76,7 @@ class MegaManager(object):
         self.__unableToCompressImagesFilePath = UNABLE_TO_COMPRESS_IMAGES_FILE
         self.__unableToCompressVideosFilePath = UNABLE_TO_COMPRESS_VIDEOS_FILE
 
+        self.__syncProfiles = []
 
         if path.exists(self.__megaManager_logFilePath):
             try:
@@ -158,44 +160,104 @@ class MegaManager(object):
         logger.debug(' Loading megaManager.cfg file.')
 
         with open(MEGAMANAGER_CONFIG, "r") as ins:
-            for line in ins:
-                if '=' in line:
-                    value = split(' = ', line)[1].strip()
-                    if line.startswith('MEGATOOLS_DIR'):
-                        self.__megaToolsDir = value
-                    elif line.startswith('FFMPEG_EXE_PATH'):
-                        self.__ffmpegExePath = value
-                    elif line.startswith('MEGA_ACCOUNTS') and not line.startswith('MEGA_ACCOUNTS_OUTPUT'):
-                        self.__megaAccountsPath = value
-                    elif line.startswith('MEGA_ACCOUNTS_OUTPUT'):
-                        self.__megaAccountsOutputPath = value
-                    elif line.startswith('LOCAL_ROOT'):
-                        self.__localRoot = value
-                    elif line.startswith('REMOTE_ROOT'):
-                        self.__remoteRoot = value
+            line = ins.readline()
+            while line:
+                if line.startswith('MEGATOOLS_DIR='):
+                    value = split('=', line)[1].strip()
+                    self.__megaToolsDir = value
+                elif line.startswith('FFMPEG_EXE_PATH='):
+                    value = split('=', line)[1].strip()
+                    self.__ffmpegExePath = value
+                elif line.startswith('MEGA_ACCOUNTS='):
+                    value = split('=', line)[1].strip()
+                    self.__megaAccountsPath = value
+                elif line.startswith('MEGA_ACCOUNTS_OUTPUT='):
+                    value = split('=', line)[1].strip()
+                    self.__megaAccountsOutputPath = value
+                elif line.startswith('[Profile'):
+                    self.__syncProfiles.append(self._load_config_profile_data(fileObject=ins))
+
+                elif line.startswith('LOCAL_ROOT='):
+                    value = split('=', line)[1].strip()
+                    self.__localRoot = value
+                elif line.startswith('REMOTE_ROOT='):
+                    value = split('=', line)[1].strip()
+                    self.__remoteRoot = value
+
+                line = ins.readline()
         ins.close()
 
-    def _all_accounts_download(self):
+    def _load_config_profile_data(self, fileObject):
+        """
+        Load config profile data.
+        """
+
+        logger = getLogger('MegaManager._load_config_profile_data')
+        logger.setLevel(self.__logLevel)
+
+        profileName = None
+        username = None
+        password = None
+        rootMappings = []
+
+        line = fileObject.readline()
+
+        while (not line.startswith('[Profile')) and line:
+
+            if line.startswith('ProfileName='):
+                value = split('=', line)[1].strip()
+                profileName = value
+            elif line.startswith('Username='):
+                value = split('=', line)[1].strip()
+                username = value
+            elif line.startswith('Password='):
+                value = split('=', line)[1].strip()
+                password = value
+            elif line.startswith('LocalRoot'):
+                value = split('=', line)[1].strip()
+                rootMapping = {}
+                rootMapping['LocalRoot'] = value
+                line = fileObject.readline()
+
+                if line.startswith('RemoteRoot'):
+                    value = split('=', line)[1].strip()
+                    rootMapping['RemoteRoot'] = value
+                    rootMappings.append(rootMapping)
+
+            line = fileObject.readline()
+
+        syncProfileObj = SyncProfile(profileName=profileName, username=username, password=password,
+                                     rootMappings=rootMappings)
+        return syncProfileObj
+
+    def _all_profiles_download(self):
         """
         Download from all MEGA accounts.
         """
 
-        logger = getLogger('MegaManager._all_accounts_download')
+        logger = getLogger('MegaManager._all_profiles_download')
         logger.setLevel(self.__logLevel)
         
-        for account in self.__foundUserPass:
-            self.__megaTools.download_all_files_from_account(account['user'], account['pass'], self.__localRoot, self.__remoteRoot)
+        for profile in self.__syncProfiles:
+            for rootMapping in profile.rootMappings:
+                self.__megaTools.download_all_files_from_account(username=profile.username, password=profile.password,
+                                                             localRoot=rootMapping['localRoot'], remoteRoot=rootMapping['remoteRoot'])
 
-    def _all_accounts_upload(self):
+            # self.__megaTools.download_all_files_from_account(account['user'], account['pass'], self.__localRoot, self.__remoteRoot)
+
+    def _all_profiles_upload(self):
         """
         Upload to all MEGA accounts.
         """
 
-        logger = getLogger('MegaManager._all_accounts_upload')
+        logger = getLogger('MegaManager._all_profiles_upload')
         logger.setLevel(self.__logLevel)
         
-        for account in self.__foundUserPass:
-            self.__megaTools.upload_to_account(account['user'], account['pass'], self.__localRoot, self.__remoteRoot)
+
+        for profile in self.__syncProfiles:
+            for rootMapping in profile.rootMappings:
+                self.__megaTools.upload_to_account(username=profile.username, password=profile.password,
+                                                   localRoot=rootMapping['localRoot'], remoteRoot=rootMapping['remoteRoot'])
 
     def _all_accounts_image_compression(self):
         """
@@ -343,7 +405,7 @@ class MegaManager(object):
 
         logger.debug(' Creating thread to download files from MEGA accounts.')
 
-        t = Thread(target=self._all_accounts_download, args=(), name='thread_download')
+        t = Thread(target=self._all_profiles_download, args=(), name='thread_download')
         self.__threads.append(t)
         t.start()
 
@@ -357,7 +419,7 @@ class MegaManager(object):
 
         logger.debug(' Creating thread to upload files to MEGA accounts.')
 
-        t = Thread(target=self._all_accounts_upload, args=(), name='thread_upload')
+        t = Thread(target=self._all_profiles_upload, args=(), name='thread_upload')
         self.__threads.append(t)
         t.start()
 
@@ -557,14 +619,14 @@ class MegaManager(object):
         if lines:
             for line in lines:
                 if not line == '':
-                    # test = split(':\d{2} ', line)
-                    remote_type = line.split()[2]
+                    remote_type = self.__megaTools.extract_file_type_from_megals_line_data(line=line)
                     if remote_type == '0':
-                        fileExt = path.splitext(split(':\d{2} ', line)[1])[1]
-                        if fileExt in self.__compressionImageExtensions:
-                            remote_filePath = split(':\d{2} ', line)[1]
+                        remote_fileExt = self.__megaTools.extract_file_extension_from_megals_line_data(line=line)
+                        # remote_fileExt = path.splitext(split(':\d{2} ', line)[1])[1]
+                        if remote_fileExt in self.__compressionImageExtensions:
+                            remote_filePath = self.__megaTools.extract_file_path_from_megals_line_data(line=line)
+                            # remote_filePath = split(':\d{2} ', line)[1]
                             file_subPath = sub(self.__remoteRoot, '', remote_filePath)
-
                             if file_subPath is not '':
                                 local_filePath = localRoot_adj + file_subPath
 
@@ -601,8 +663,9 @@ class MegaManager(object):
                                         logger.debug(' Error, image file previously processed. Moving on.  "%s"!' % local_filePath)
                                 else:
                                     logger.debug(' Error, image file does NOT exist locally. Moving on.  "%s"!' % local_filePath)
-        else:
-            logger.debug(' Error, could not get remote file data.')
+
+        # else:
+        #     logger.debug(' Error, could not get remote file data.')
 
     def _find_video_files_to_compress(self, username, password):
         """
@@ -632,20 +695,20 @@ class MegaManager(object):
         if lines:
             for line in lines:
                 if not line == '':
-                    remote_type = line.split()[2]
+                    remote_type = self.__megaTools.extract_file_type_from_megals_line_data(line=line)
+                    # remote_type = line.split()[2]
                     if remote_type == '0':
-                        fileExt = path.splitext(split(':\d{2} ', line)[1])[1]
-                        if fileExt in self.__compressionVideoExtensions:
-                            remote_filePath = split(':\d{2} ', line)[1]
+                        remote_fileExt = self.__megaTools.extract_file_extension_from_megals_line_data(line=line)
+                        # fileExt = path.splitext(split(':\d{2} ', line)[1])[1]
+                        if remote_fileExt in self.__compressionVideoExtensions:
+                            remote_filePath = self.__megaTools.extract_file_path_from_megals_line_data(line=line)
+                            # remote_filePath = split(':\d{2} ', line)[1]
                             file_subPath = sub(self.__remoteRoot, '', remote_filePath)
-
                             if file_subPath is not '':
                                 local_filePath = localRoot_adj + file_subPath
-
                                 if path.isfile(local_filePath):
                                     if (local_filePath not in self.__compressedVideoFiles) \
                                             and (local_filePath not in self.__unableToCompressVideoFiles):
-
                                         newFilePath = local_filePath.rsplit(".", 1)[0] + '_NEW.mp4'
 
                                         if path.exists(newFilePath):
@@ -690,9 +753,9 @@ class MegaManager(object):
                                     logger.debug(
                                         ' Error, local video file doesnt exist: "%s"!' % local_filePath)
 
-        else:
-            logger.error(' Error, could not get remote file details')
-            return False
+        # else:
+        #     logger.error(' Error, could not get remote file details')
+        #     return False
 
     def _create_mega_accounts_data_file(self):
         """
@@ -734,15 +797,30 @@ class MegaManager(object):
         logger.setLevel(self.__logLevel)
 
         with open(self.__megaAccountsOutputPath, "w") as outs:
-            for accountDetails in sorted(self.__accounts_details_dict):
-                for line in self.__accounts_details_dict[accountDetails]:
-                    outs.write(line)
+            for username in sorted(self.__accounts_details_dict):
+                accountObj = self.__accounts_details_dict[username]
+                lines = []
+                line = 'Total Space: ' + str(accountObj.remote_totalSpace)
+                lines.append(line)
+                line = 'Used Space: ' + str(accountObj.remote_usedSpace)
+                lines.append(line)
+                line = 'Free Space: ' + str(accountObj.remote_freeSpace)
+                lines.append(line)
+                outs.write(lines)
         outs.close()
 
-
-
-
     def _get_account_details(self, username, password):
+        """
+        Creats dictionary of account data (remote size, local size, etc...) for self.__megaAccountsOutputPath file.
+
+        Args:
+            username (str): username of account to find local video files for
+            password (str): password of account to find local video files for
+        """
+
+        self.__accounts_details_dict['username'] = self._get_account_remote_details(username=username, password=password)
+
+    def _get_account_remote_details(self, username, password):
         """
         Creats dictionary of account data (remote size, local size, etc...) for self.__megaAccountsOutputPath file.
 
@@ -754,57 +832,60 @@ class MegaManager(object):
         logger = getLogger('MegaManager._get_account_details')
         logger.setLevel(self.__logLevel)
 
+        accountObj = Account(username=username, password=password, logLevel=self.__logLevel)
         accountDetails = []
         accountDetails.append(username + ' - ' + password + '\n')
-        chdir('%s' % self.__megaToolsDir)
+        # chdir('%s' % self.__megaToolsDir)
 
-        freeSpace = self.__megaTools.get_account_free_space(username=username, password=password)
-        accountDetails.append('FREE SIZE: ' + freeSpace)
+        accountObj.remote_totalSpace = self.__megaTools.get_account_total_space(username=username, password=password)
 
-        usedSpace = self.__megaTools.get_account_used_space(username=username, password=password)
-        accountDetails.append('REMOTE SIZE: ' + usedSpace)
+        accountObj.remote_freeSpace = self.__megaTools.get_account_free_space(username=username, password=password)
+        # accountDetails.append('FREE SIZE: ' + remote_freeSpace)
 
-        subDirs = self.__megaTools.get_remote_subdir_names_only(username=username, password=password, remotePath=self.__remoteRoot)
+        accountObj.remote_usedSpace = self.__megaTools.get_account_used_space(username=username, password=password)
+        # accountDetails.append('REMOTE SIZE: ' + usedSpace)
+        #
+        # subDirs = self.__megaTools.get_remote_subdir_names_only(username=username, password=password, remotePath=self.__remoteRoot)
+        #
+        # directoryLines = []
+        # totalLocalSize = 0
+        #
+        # if subDirs:
+        #     for line in subDirs:
+        #         localDirSize = 0
+        #         localDirPath = self.__localRoot + '\\' + line
+        #
+        #         if path.exists(localDirPath) and not line == '':
+        #             for r, d, f in walk(localDirPath):
+        #                 for file in f:
+        #                     filePath = path.join(r, file)
+        #                     if path.exists(filePath):
+        #                         localDirSize = localDirSize + path.getsize(filePath)
+        #
+        #             totalLocalSize = totalLocalSize + localDirSize
+        #             remoteDirSize = self.__megaTools.get_remote_dir_size(username, password, localDirPath,
+        #                                                                  localRoot=self.__localRoot,
+        #                                                                  remoteRoot=self.__remoteRoot)
+        #
+        #             directoryLines.append(line +
+        #                                   ' (%s remote, %s local)\n' % (self.__lib.get_mb_size_from_bytes(int(remoteDirSize)), self.__lib.get_mb_size_from_bytes(int(localDirSize))))
+        #
+        #         elif not line == '':
+        #             directoryLines.append(line + ' (%s remote, NONE local)\n' % (self.__lib.get_mb_size_from_bytes(int(remoteDirSize))))
+        #
+        #     accountDetails.append('LOCAL SIZE: %s \n' % self.__lib.get_mb_size_from_bytes(totalLocalSize))
+        #
+        #     for line in directoryLines:
+        #         accountDetails.append(line)
+        #     accountDetails.append('\n')
+        #     accountDetails.append('\n')
+        #
+        #     self.__accounts_details_dict[username] = accountDetails
 
-        directoryLines = []
-        totalLocalSize = 0
-
-        if subDirs:
-            for line in subDirs:
-                localDirSize = 0
-                localDirPath = self.__localRoot + '\\' + line
-                # remoteDirPath = self.__lib.get_remote_path_from_local_path(localPath=localDirPath, localRoot=self.__localRoot, remoteRoot=self.__remoteRoot)
-
-                if path.exists(localDirPath) and not line == '':
-                    # localDirSize = path.getsize(localDirPath)
-                    for r, d, f in walk(localDirPath):
-                        for file in f:
-                            filePath = path.join(r, file)
-                            if path.exists(filePath):
-                                localDirSize = localDirSize + path.getsize(filePath)
-
-                    totalLocalSize = totalLocalSize + localDirSize
-                    remoteDirSize = self.__megaTools.get_remote_dir_size(username, password, localDirPath,
-                                                                         localRoot=self.__localRoot,
-                                                                         remoteRoot=self.__remoteRoot)
-
-                    directoryLines.append(line +
-                                          ' (%s remote, %s local)\n' % (self.__lib.get_mb_size_from_bytes(int(remoteDirSize)), self.__lib.get_mb_size_from_bytes(int(localDirSize))))
-
-                elif not line == '':
-                    directoryLines.append(line + ' (%s remote, NONE local)\n' % (self.__lib.get_mb_size_from_bytes(int(remoteDirSize))))
-
-            accountDetails.append('LOCAL SIZE: %s \n' % self.__lib.get_mb_size_from_bytes(totalLocalSize))
-
-            for line in directoryLines:
-                accountDetails.append(line)
-            accountDetails.append('\n')
-            accountDetails.append('\n')
-
-            self.__accounts_details_dict[username] = accountDetails
-        else:
-            logger.error(' Error, could not get remote directory names!')
-            return False
+        return accountObj
+        # else:
+        #     logger.error(' Error, could not get remote directory names!')
+        #     return False
 
     def _tear_down(self):
         """
