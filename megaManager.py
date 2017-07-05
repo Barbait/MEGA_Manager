@@ -103,7 +103,7 @@ class MegaManager(object):
             self.__megaTools = MegaTools_Lib(megaToolsDir=self.__megaToolsDir, downSpeedLimit=self.__downSpeed,
                                              upSpeedLimit=self.__upSpeed, logLevel=self.__logLevel)
 
-            self.__foundUserPass = self._get_accounts_user_pass(file=self.__megaAccountsPath)
+            # self.__foundUserPass = self._get_accounts_user_pass(file=self.__megaAccountsPath)
 
         except Exception as e:
             print(' Exception: ' + str(e))
@@ -259,31 +259,38 @@ class MegaManager(object):
                 self.__megaTools.upload_to_account(username=profile.username, password=profile.password,
                                                    localRoot=rootMapping['localRoot'], remoteRoot=rootMapping['remoteRoot'])
 
-    def _all_accounts_image_compression(self):
+    def _all_profiles_image_compression(self):
         """
         Compress image.
         """
 
-        logger = getLogger('MegaManager._all_accounts_image_compression')
+        logger = getLogger('MegaManager._all_profiles_image_compression')
         logger.setLevel(self.__logLevel)
         
         logger.debug(' Compressing local image files')
 
-        for account in self.__foundUserPass:
-            self._find_image_files_to_compress(account['user'], account['pass'])
+        for profile in self.__syncProfiles:
+            for rootMapping in profile.rootMappings:
+                self._find_image_files_to_compress(username=profile.username, password=profile.password,
+                                                   localRoot=rootMapping.localPath, remoteRoot=rootMapping.remotePath)
 
-    def _all_accounts_video_compression(self):
+    def _all_profiles_video_compression(self):
         """
         Compress video.
         """
 
-        logger = getLogger('MegaManager._all_accounts_video_compression')
+        logger = getLogger('MegaManager._all_profiles_video_compression')
         logger.setLevel(self.__logLevel)
 
         logger.debug(' Compressing local video files')
 
-        for account in self.__foundUserPass:
-            self._find_video_files_to_compress(account['user'], account['pass'])
+        for profile in self.__syncProfiles:
+            for rootMapping in profile.rootMappings:
+                self._find_video_files_to_compress(username=profile.username, password=profile.password,
+                                                   localRoot=rootMapping.localPath, remoteRoot=rootMapping.remotePath)
+
+        # for account in self.__foundUserPass:
+        #     self._find_video_files_to_compress(account['user'], account['pass'])
 
     def _wait_for_threads_to_finish(self, timeout=99999):
         """
@@ -455,7 +462,7 @@ class MegaManager(object):
         self.__compressedImageFiles = self.__lib.load_file_as_list(filePath=self.__compressedImagesFilePath)
         self.__unableToCompressImageFiles = self.__lib.load_file_as_list(filePath=self.__unableToCompressImagesFilePath)
 
-        t_compress = Thread(target=self._all_accounts_image_compression, args=( ), name='thread_compressImages')
+        t_compress = Thread(target=self._all_profiles_image_compression, args=( ), name='thread_compressImages')
         self.__threads.append(t_compress)
         t_compress.start()
 
@@ -472,7 +479,7 @@ class MegaManager(object):
         self.__compressedVideoFiles = self.__lib.load_file_as_list(filePath=self.__compressedVideosFilePath)
         self.__unableToCompressVideoFiles = self.__lib.load_file_as_list(filePath=self.__unableToCompressVideosFilePath)
 
-        t_compress = Thread(target=self._all_accounts_video_compression, args=( ), name='thread_compressVideos')
+        t_compress = Thread(target=self._all_profiles_video_compression, args=( ), name='thread_compressVideos')
         self.__threads.append(t_compress)
         t_compress.start()
 
@@ -590,13 +597,15 @@ class MegaManager(object):
             logger.debug(' Exception: ' + str(e))
             self._tear_down()
 
-    def _find_image_files_to_compress(self, username, password):
+    def _find_image_files_to_compress(self, username, password, localRoot, remoteRoot):
         """
         Find image files to compress.
 
         Args:
             username (str): Username of account to find local images for.
             password (str): Password of account to find local images for.
+            localRoot (str): Local path to search for image files to compress
+            remoteRoot (str): Remote path to search for image files to compress
         """
 
         logger = getLogger('MegaManager._find_image_files_to_compress')
@@ -604,7 +613,7 @@ class MegaManager(object):
 
         logger.debug(' Compressing image files.')
 
-        localRoot_adj = sub('\\\\', '/', self.__localRoot)
+        localRoot_adj = sub('\\\\', '/', localRoot)
         # chdir('%s' % self.__megaToolsDir)
 
         # cmd = 'megals -lR -u %s -p %s "%s"' % (username, password, self.__remoteRoot)
@@ -614,7 +623,7 @@ class MegaManager(object):
         # lines = out.split('\r\n')
 
         lines = self.__megaTools.get_remote_file_data_recursively(username=username, password=password,
-                                                          remotePath=self.__remoteRoot)
+                                                          remotePath=remoteRoot)
 
         if lines:
             for line in lines:
@@ -626,7 +635,7 @@ class MegaManager(object):
                         if remote_fileExt in self.__compressionImageExtensions:
                             remote_filePath = self.__megaTools.extract_file_path_from_megals_line_data(line=line)
                             # remote_filePath = split(':\d{2} ', line)[1]
-                            file_subPath = sub(self.__remoteRoot, '', remote_filePath)
+                            file_subPath = sub(remoteRoot, '', remote_filePath)
                             if file_subPath is not '':
                                 local_filePath = localRoot_adj + file_subPath
 
@@ -667,13 +676,15 @@ class MegaManager(object):
         # else:
         #     logger.debug(' Error, could not get remote file data.')
 
-    def _find_video_files_to_compress(self, username, password):
+    def _find_video_files_to_compress(self, username, password, localRoot, remoteRoot):
         """
         Find video files to __compressAll.
 
         Args:
             username (str): username of account to find local video files for
             password (str): password of account to find local video files for
+            localRoot (str): Local path to search for image files to compress
+            remoteRoot (str): Remote path to search for image files to compress
         """
 
         logger = getLogger('MegaManager._find_video_files_to_compress')
@@ -681,7 +692,7 @@ class MegaManager(object):
         
         logger.debug(' Finding video files to compress.')
 
-        localRoot_adj = sub('\\\\', '/', self.__localRoot)
+        localRoot_adj = sub('\\\\', '/', localRoot)
         # chdir('%s' % self.__megaToolsDir)
 
         # cmd = 'megals -lR -u %s -p %s "%s"' % (username, password, self.__remoteRoot)
@@ -690,7 +701,7 @@ class MegaManager(object):
         # (out, err) = proc.communicate()
 
         lines = self.__megaTools.get_remote_file_data_recursively(username=username, password=password,
-                                                                  remotePath=self.__remoteRoot)
+                                                                  remotePath=remoteRoot)
 
         if lines:
             for line in lines:
@@ -703,7 +714,7 @@ class MegaManager(object):
                         if remote_fileExt in self.__compressionVideoExtensions:
                             remote_filePath = self.__megaTools.extract_file_path_from_megals_line_data(line=line)
                             # remote_filePath = split(':\d{2} ', line)[1]
-                            file_subPath = sub(self.__remoteRoot, '', remote_filePath)
+                            file_subPath = sub(remoteRoot, '', remote_filePath)
                             if file_subPath is not '':
                                 local_filePath = localRoot_adj + file_subPath
                                 if path.isfile(local_filePath):
