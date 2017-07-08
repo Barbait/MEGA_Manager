@@ -404,7 +404,36 @@ class MegaTools_Lib(object):
         logger.debug(' Error, could NOT find remote file modified date!')
         return None
 
-    def get_remote_file_size(self, username, password, localFilePath, localRoot, remoteRoot):
+    def get_remote_file_size(self, username, password, remotePath):
+        """
+        Get remote file size in bytes of given remote path.
+
+        Args:
+            username (str): username for MEGA account
+            password (str): password for MEGA account
+            remotePath (str): remote path of file to get size for
+
+        Returns:
+             int: remote file size
+        """
+
+        logger = getLogger('MegaTools_Lib.get_remote_file_size')
+        logger.setLevel(self.__logLevel)
+
+        cmd = 'megals -ln -u %s -p %s "%s"' % (username, password, remotePath)
+        out, err = self.__lib.exec_cmd_and_return_output(command=cmd, workingDir=self.__megaToolsDir)
+
+        line_split = out.split()
+        if len(line_split) > 2:
+            remoteFileSize = line_split[3]
+            logger.debug(' Success, remote file size for path "%s" is "%s"' % (remotePath, remoteFileSize))
+            return int(remoteFileSize)
+        else:
+            logger.error(' Error, could not get remote file size of path "%s"' % remotePath)
+            return None
+
+
+    def get_remote_file_size_from_local_path(self, username, password, localFilePath, localRoot, remoteRoot):
         """
         Get remote file sizes of equivalent local file path
 
@@ -419,21 +448,14 @@ class MegaTools_Lib(object):
              int: remote file size
         """
 
-        logger = getLogger('MegaTools_Lib.get_remote_file_size')
+        logger = getLogger('MegaTools_Lib.get_remote_file_size_from_local_path')
         logger.setLevel(self.__logLevel)
 
         remotePath = self.__lib.get_remote_path_from_local_path(localPath=localFilePath, localRoot=localRoot,
                                                                 remoteRoot=remoteRoot)
         if remotePath:
-
-            cmd = 'megals -ln -u %s -p %s "%s"' % (username, password, remotePath)
-            out, err = self.__lib.exec_cmd_and_return_output(command=cmd, workingDir=self.__megaToolsDir)
-
-            line_split = out.split()
-            if len(line_split) > 2:
-                remoteFileSize = line_split[3]
-
-                return remoteFileSize
+            remoteFileSize = self.get_remote_file_size(username=username, password=password, remotePath=remotePath)
+            return remoteFileSize
 
         return None
 

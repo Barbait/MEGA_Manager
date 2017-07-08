@@ -15,7 +15,7 @@ __author__ = 'szmania'
 SCRIPT_DIR = path.dirname(path.realpath(__file__))
 
 class SyncProfile(Account):
-    def __init__(self, profileName, username, password, rootMappings, logLevel='DEBUG'):
+    def __init__(self, profileName, username, password, pathMappings, logLevel='DEBUG'):
         """
         Library for ffmpeg converter and encoder interaction.
 
@@ -23,17 +23,47 @@ class SyncProfile(Account):
             profileName (str): Unique profile name
             username (str): MEGA account user name
             password (str): MEGA account password
-            rootMappings (list): dictionary of local and remote root mappings.
+            pathMappings (list): dictionary of local and remote path mappings.
             logLevel (str): Logging level setting ie: "DEBUG" or "WARN"
         """
 
         Account.__init__(self, username=username, password=password, logLevel=logLevel)
 
         self.__profileName = profileName
-        self.__rootMappings = rootMappings
+        self.__pathMappings = pathMappings
 
         self.__local_usedSpace = None
         self.__remote_usedSpace = None
+
+        self.__account = super(self.__class__, self)
+
+    @property
+    def account(self):
+        """
+        Getter for MEGA profile account.
+
+        Returns:
+            Account: Returns MEGA profile account
+        """
+
+        logger = getLogger('SyncProfile.account')
+        logger.setLevel(self.__logLevel)
+
+        return self.__account
+
+    @account.setter
+    def account(self, value):
+        """
+        Setter for MEGA profile account.
+
+        Args:
+            value (str): value to set profile account to.
+        """
+
+        logger = getLogger('SyncProfile.account')
+        logger.setLevel(self.__logLevel)
+
+        self.__account = value
 
     @property
     def local_usedSpace(self):
@@ -62,6 +92,34 @@ class SyncProfile(Account):
         logger.setLevel(self.__logLevel)
 
         self.__local_usedSpace = value
+
+    @property
+    def pathMappings(self):
+        """
+        Getter for MEGA profile path mappings.
+
+        Returns:
+            Account: Returns MEGA profile path mappings list of PathMapping objects
+        """
+
+        logger = getLogger('SyncProfile.pathMappings')
+        logger.setLevel(self.__logLevel)
+
+        return self.__pathMappings
+
+    @pathMappings.setter
+    def pathMappings(self, value):
+        """
+        Setter for MEGA profile pathMappings.
+
+        Args:
+            value (list): list of PathMapping objects to set to.
+        """
+
+        logger = getLogger('SyncProfile.pathMappings')
+        logger.setLevel(self.__logLevel)
+
+        self.__pathMappings = value
 
     @property
     def profileName(self):
@@ -119,159 +177,174 @@ class SyncProfile(Account):
 
         self.__remote_usedSpace = value
 
-    def add_root_mapping(self, localRoot, remoteRoot):
+    def add_path_mapping(self, localRoot, remoteRoot):
         """
-        Add root mapping to profile root mappings list.
+        Add path mapping to profile path mappings list.
 
         Args:
             localRoot (str): Local root of pair.
             remoteRoot (str): Remote root of pair.
         """
 
-        logger = getLogger('SyncProfile.add_root_mapping')
+        logger = getLogger('SyncProfile.add_path_mapping')
         logger.setLevel(self.__logLevel)
 
-        logger.debug(' Adding root mapping to profile.')
+        logger.debug(' Adding path mapping to profile.')
 
         try:
             pathMapObj = PathMapping(localPath=localRoot, remotePath=remoteRoot)
-            self.__rootMappings[self.get_root_mappings_count()] = pathMapObj
+            self.__pathMappings[self.get_path_mappings_count()] = pathMapObj
             return True
         except Exception as e:
             logger.error(' Exception: %s' % str(e))
             return False
 
-    def get_root_mapping_local_root(self, index=None):
+    def get_path_mapping(self, index=None):
+        """
+        Getter for profile path mapping at given index.
+
+        Args:
+            index (int): index of path mapping to get.
+
+        Returns:
+            PathMapping: Returns PathMapping object.
+        """
+
+        logger = getLogger('SyncProfile.get_path_mapping')
+        logger.setLevel(self.__logLevel)
+
+        logger.debug(' Returning path mapping at index %d.' % index)
+
+        if index:
+            if not index + 1 > len(self.__pathMappings):
+                return self.__pathMappings[index]
+            else:
+                logger.error(' Error, given index of "%d" is larger than path mappings list for profile.' % index)
+                return None
+        else:
+            if len(self.__pathMappings) > 0:
+                logger.debug(' No index given. Returning first item.')
+                return self.__pathMappings[0].remotePath
+            else:
+                logger.error(' Error, no path mapping exist for this profile!')
+                return None
+
+    def get_path_mapping_local_path(self, index=None):
         """
         Getter for profile local root path.
 
         Args:
-            index (int): index of root mapping to get local root of.
+            index (int): index of path mapping to get local root of.
         
         Returns:
             String: Returns local root path.
         """
 
-        logger = getLogger('SyncProfile.get_root_mapping_local_root')
+        logger = getLogger('SyncProfile.get_path_mapping_local_path')
         logger.setLevel(self.__logLevel)
         
-        logger.debug(' Returning root mapping local root path.')
+        logger.debug(' Returning path mapping local root path.')
         
         if index:
-            if not index + 1 > len(self.__rootMappings):
-                return self.__rootMappings[index].localPath
+            if not index + 1 > len(self.__pathMappings):
+                return self.__pathMappings[index].localPath
             else:
-                logger.error(' Error, given index of "%d" is larger than root mappings list for profile.' % index)
+                logger.error(' Error, given index of "%d" is larger than path mappings list for profile.' % index)
                 return None
         else:
-            if len(self.__rootMappings) > 0:
+            if len(self.__pathMappings) > 0:
                 logger.debug(' No index given. Returning first item.')
-                return self.__rootMappings[0].localPath
+                return self.__pathMappings[0].localPath
             else:
-                logger.error(' Error, no root mappings exist for this profile!')
+                logger.error(' Error, no path mappings exist for this profile!')
                 return None
 
-    def get_root_mapping_remote_root(self, index=None):
+    def get_path_mapping_remote_path(self, index=None):
         """
         Getter for profile remote root path.
 
         Args:
-            index (int): index of root mapping to get remote root of.
+            index (int): index of path mapping to get remote root of.
 
         Returns:
             String: Returns remote root path.
         """
 
-        logger = getLogger('SyncProfile.get_root_mapping_remote_root')
+        logger = getLogger('SyncProfile.get_path_mapping_remote_path')
         logger.setLevel(self.__logLevel)
 
-        logger.debug(' Returning root mapping remote root path.')
+        logger.debug(' Returning path mapping remote root path.')
 
         if index:
-            if not index + 1 > len(self.__rootMappings):
-                return self.__rootMappings[index].remotePath
+            if not index + 1 > len(self.__pathMappings):
+                return self.__pathMappings[index].remotePath
             else:
-                logger.error(' Error, given index of "%d" is larger than root mappings list for profile.' % index)
+                logger.error(' Error, given index of "%d" is larger than path mappings list for profile.' % index)
                 return None
         else:
-            if len(self.__rootMappings) > 0:
+            if len(self.__pathMappings) > 0:
                 logger.debug(' No index given. Returning first item.')
-                return self.__rootMappings[0].remotePath
+                return self.__pathMappings[0].remotePath
             else:
-                logger.error(' Error, no root mappings exist for this profile!')
+                logger.error(' Error, no path mappings exist for this profile!')
                 return None
 
-    def get_root_mappings_count(self):
+    def get_path_mappings_count(self):
         """
-        Return root mappings list size.
+        Return path mappings list size.
 
         Returns:
-            integer: size of root mappings list.
+            integer: size of path mappings list.
         """
 
-        logger = getLogger('SyncProfile.get_root_mappings_count')
+        logger = getLogger('SyncProfile.get_path_mappings_count')
         logger.setLevel(self.__logLevel)
 
-        return len(self.__rootMappings)
+        return len(self.__pathMappings)
 
-    def set_root_mapping_local_root(self, value, index=None):
+    def set_path_mapping_local_path(self, value, index=None):
         """
         Setter for profile local root path.
 
         Args:
-            index (int): index of root mapping to set local root of.
+            index (int): index of path mapping to set local root of.
             value (str): value to set local root to.
         """
 
-        logger = getLogger('SyncProfile.set_root_mapping_local_root')
+        logger = getLogger('SyncProfile.set_path_mapping_local_path')
         logger.setLevel(self.__logLevel)
 
-        logger.debug(' Setting root mapping local root path.')
+        logger.debug(' Setting path mapping local root path.')
 
         # if index:
-        if not index + 1 > len(self.__rootMappings):
-            self.__rootMappings[index].localPath = value
+        if not index + 1 > len(self.__pathMappings):
+            self.__pathMappings[index].localPath = value
             return True
         else:
-            logger.error(' Error, given index of "%d" is larger than root mappings list for profile.' % index)
+            logger.error(' Error, given index of "%d" is larger than path mappings list for profile.' % index)
             return False
-        # else:
-        #     if len(self.__rootMappings) > 0:
-        #         logger.debug(' No index given. Adding new item.')
-        #         self.__rootMappings[self.get_root_mappings_count()]['localRoot'] = value
-        #         return True
-        #     else:
-        #         logger.error(' Error, no root mappings exist for this profile!')
-        #         return False
 
-    def set_root_mapping_remote_root(self, index, value):
+    def set_path_mapping_remote_root(self, index, value):
         """
         Setter for profile remote root path.
 
         Args:
-            index (int): index of root mapping to set remote root of.
+            index (int): index of path mapping to set remote root of.
             value (str): value to set remote root to.
         """
 
-        logger = getLogger('SyncProfile.set_root_mapping_remote_root')
+        logger = getLogger('SyncProfile.set_path_mapping_remote_root')
         logger.setLevel(self.__logLevel)
 
-        logger.debug(' Setting root mapping remote root path.')
+        logger.debug(' Setting path mapping remote root path.')
 
-        if not index + 1 > len(self.__rootMappings):
-            self.__rootMappings[index].remotePath = value
+        if not index + 1 > len(self.__pathMappings):
+            self.__pathMappings[index].remotePath = value
             return True
         else:
-            logger.error(' Error, given index of "%d" is larger than root mappings list for profile.' % index)
+            logger.error(' Error, given index of "%d" is larger than path mappings list for profile.' % index)
             return False
-        # else:
-        #     if len(self.__rootMappings) > 0:
-        #         logger.debug(' No index given. Adding new item.')
-        #         self.__rootMappings[self.get_root_mappings_count()]['remoteRoot'] = value
-        #         return True
-        #     else:
-        #         logger.error(' Error, no root mappings exist for this profile!')
-        #         return False
-        #         
+
+    
                 
 
