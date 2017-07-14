@@ -31,6 +31,7 @@ class SyncProfile(Account):
 
         self.__profileName = profileName
         self.__pathMappings = pathMappings
+        self.__logLevel = logLevel
 
         self.__local_usedSpace = None
         self.__remote_usedSpace = None

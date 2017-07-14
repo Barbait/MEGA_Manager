@@ -13,6 +13,7 @@ from argparse import ArgumentParser
 from logging import DEBUG, getLogger, FileHandler, Formatter, StreamHandler
 from libs import CompressImages_Lib, FFMPEG_Lib, Lib, MegaTools_Lib
 from os import chdir, getpid, path, remove, rename, walk
+from pathMapping import PathMapping
 from psutil import IDLE_PRIORITY_CLASS, Process
 from random import randint
 from re import findall, split, sub
@@ -98,10 +99,10 @@ class MegaManager(object):
         logger.setLevel(self.__logLevel)
 
         for profile in self.__syncProfiles:
-            for rootMapping in profile.rootMappings:
+            for pathMapping in profile.pathMappings:
                 self.__megaTools.download_all_files_from_account(username=profile.username, password=profile.password,
-                                                                 localRoot=rootMapping['localRoot'],
-                                                                 remoteRoot=rootMapping['remoteRoot'])
+                                                                 localRoot=pathMapping['localRoot'],
+                                                                 remoteRoot=pathMapping['remoteRoot'])
 
                 # self.__megaTools.download_all_files_from_account(account['user'], account['pass'], self.__localRoot, self.__remoteRoot)
 
@@ -116,9 +117,9 @@ class MegaManager(object):
         logger.debug(' Compressing local image files')
 
         for profile in self.__syncProfiles:
-            for rootMapping in profile.rootMappings:
+            for pathMapping in profile.pathMappings:
                 self._find_image_files_to_compress(username=profile.username, password=profile.password,
-                                                   localRoot=rootMapping.localPath, remoteRoot=rootMapping.remotePath)
+                                                   localRoot=pathMapping.localPath, remoteRoot=pathMapping.remotePath)
 
     def _all_profiles_upload(self):
         """
@@ -129,10 +130,10 @@ class MegaManager(object):
         logger.setLevel(self.__logLevel)
 
         for profile in self.__syncProfiles:
-            for rootMapping in profile.rootMappings:
+            for pathMapping in profile.pathMappings:
                 self.__megaTools.upload_to_account(username=profile.username, password=profile.password,
-                                                   localRoot=rootMapping['localRoot'],
-                                                   remoteRoot=rootMapping['remoteRoot'])
+                                                   localRoot=pathMapping['localRoot'],
+                                                   remoteRoot=pathMapping['remoteRoot'])
 
     def _all_profiles_video_compression(self):
         """
@@ -738,15 +739,12 @@ class MegaManager(object):
                 value = split('=', line)[1].strip()
                 password = value
             elif line.startswith('LocalPath'):
-                value = split('=', line)[1].strip()
-                pathMapping = {}
-                pathMapping['LocalPath'] = value
+                localPath = split('=', line)[1].strip()
                 line = fileObject.readline()
-
                 if line.startswith('RemotePath'):
-                    value = split('=', line)[1].strip()
-                    pathMapping['RemotePath'] = value
-                    pathMappings.append(pathMapping)
+                    remotePath = split('=', line)[1].strip()
+                    pathMappingObj = PathMapping(localPath=localPath, remotePath=remotePath, logLevel=self.__logLevel)
+                    pathMappings.append(pathMappingObj)
 
             line = fileObject.readline()
 
@@ -932,12 +930,10 @@ class MegaManager(object):
 
     def _wait_for_threads_to_finish(self, timeout=99999):
         """
-        Wait for __threads to finish.
+        Wait for threads to finish.
 
-        :param timeout: Maximum time in seconds to wait for __threads.
-        :type timeout: int
-
-        :return :
+        Args:
+            timeout (int): Maximum time in seconds to wait for threads.
         """
 
         logger = getLogger('MegaManager._wait_for_threads_to_finish')
@@ -991,7 +987,7 @@ class MegaManager(object):
 
         try:
 
-            self._create_thread_create_mega_accounts_data_file()
+            self._create_thread_create_profiles_data_file()
 
             if self.__removeIncomplete:
                 self._create_threads_local_unfinished_file_remover()

@@ -28,6 +28,7 @@ class PathMapping(Account):
 
         self.__localPath = localPath
         self.__remotePath = remotePath
+        self.__logLevel = logLevel
 
         self.__localPath_freeSpace = None
         self.__localPath_usedSpace = None
